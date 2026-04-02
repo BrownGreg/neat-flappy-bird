@@ -3,6 +3,12 @@ import os
 import neat
 import pickle
 import matplotlib.pyplot as plt
+import torch
+import multiprocessing
+from neat.parallel import ParallelEvaluator
+
+print(torch.cuda.is_available())     
+print(torch.cuda.get_device_name(0))   
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'game'))
 
@@ -26,9 +32,8 @@ def evaluate_genome(genome, config):
     return env.frames + 500 * env.score
 
 
-def eval_genomes(genomes, config):
-    for genome_id, genome in genomes:
-        genome.fitness = evaluate_genome(genome, config)
+def eval_genome(genome, config):
+    return evaluate_genome(genome, config)
 
 
 def plot_stats(stats, output_path):
@@ -60,6 +65,7 @@ def run():
 
     population = neat.Population(config)
     population.add_reporter(neat.StdOutReporter(True))
+    pe = ParallelEvaluator(multiprocessing.cpu_count(), eval_genome)
     stats = neat.StatisticsReporter()
     population.add_reporter(stats)
 
@@ -70,7 +76,7 @@ def run():
     )
     population.add_reporter(checkpointer)
 
-    best = population.run(eval_genomes, N_GENERATIONS)
+    best = population.run(pe.evaluate, N_GENERATIONS)
 
     genome_path = os.path.join(os.path.dirname(__file__), 'best_genome.pkl')
     with open(genome_path, 'wb') as f:
