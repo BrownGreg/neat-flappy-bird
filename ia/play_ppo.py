@@ -30,7 +30,7 @@ class FlappyBirdGymEnv(gym.Env):
 
 
 if __name__ == '__main__':
-    model = PPO.load("ia/best_model_v2/best_model")
+    model = PPO.load("ia/best_model_optuna/best_model")
     env = FlappyBirdGymEnv()
 
     pygame.init()

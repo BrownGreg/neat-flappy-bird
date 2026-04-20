@@ -2,3 +2,9 @@ pygame>=2.1.0
 numpy
 neat-python
 matplotlib
+torch 
+graphviz
+stable-baselines3
+gymnasium
+scikit-learn
+optuna

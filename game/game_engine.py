@@ -114,7 +114,7 @@ class FlappyBirdEnv:
         get_state()      -> list[float] de 5 valeurs normalisées
     """
 
-    def __init__(self):
+    def __init__(self, render=False, screen=None):
         self.bird = None
         self.pipes = []
         self.score = 0

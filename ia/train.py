@@ -1,39 +1,46 @@
 import sys
 import os
+import random
 import neat
 import pickle
-import matplotlib.pyplot as plt
-import torch
+import functools
 import multiprocessing
-from neat.parallel import ParallelEvaluator
-
-print(torch.cuda.is_available())     
-print(torch.cuda.get_device_name(0))   
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'game'))
-
 from game_engine import FlappyBirdEnv
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'neat_config.txt')
-N_GENERATIONS = 100
+GENOME_PATH = os.path.join(os.path.dirname(__file__), 'best_genome.pkl')
+N_GENERATIONS = 500
+N_RUNS = 7
 
 
-def evaluate_genome(genome, config):
+def evaluate_genome(genome, config, seeds):
     net = neat.nn.FeedForwardNetwork.create(genome, config)
-    env = FlappyBirdEnv()
-    state = env.reset()
-    done = False
+    total_fitness = 0.0
 
-    while not done:
-        output = net.activate(state)
-        action = 1 if output[0] > 0.5 else 0
-        state, reward, done = env.step(action)
+    for seed in seeds:
+        random.seed(seed)
+        env = FlappyBirdEnv()
+        state = env.reset()
+        done = False
+        run_fitness = 0.0
 
-    return env.frames + 500 * env.score
+        while not done:
+            output = net.activate(state)
+            action = 1 if output[0] > 0.5 else 0
+            state, reward, done = env.step(action)
 
+            if not done:
+                run_fitness += 1.0
+                if state[3] > 0 and state[4] > 0:
+                    run_fitness += 2.0
 
-def eval_genome(genome, config):
-    return evaluate_genome(genome, config)
+        run_fitness += env.score * 1000
+        total_fitness += run_fitness
+
+    return total_fitness / N_RUNS
 
 
 def plot_stats(stats, output_path):
@@ -65,27 +72,40 @@ def run():
 
     population = neat.Population(config)
     population.add_reporter(neat.StdOutReporter(True))
-    pe = ParallelEvaluator(multiprocessing.cpu_count(), eval_genome)
     stats = neat.StatisticsReporter()
     population.add_reporter(stats)
 
     os.makedirs(os.path.join(os.path.dirname(__file__), 'checkpoints'), exist_ok=True)
-    checkpointer = neat.Checkpointer(
+    population.add_reporter(neat.Checkpointer(
         generation_interval=10,
         filename_prefix=os.path.join(os.path.dirname(__file__), 'checkpoints', 'checkpoint-')
-    )
-    population.add_reporter(checkpointer)
+    ))
 
-    best = population.run(pe.evaluate, N_GENERATIONS)
+    best_ever = None
 
-    genome_path = os.path.join(os.path.dirname(__file__), 'best_genome.pkl')
-    with open(genome_path, 'wb') as f:
-        pickle.dump(best, f)
+    def eval_genomes(genomes, config):
+        nonlocal best_ever
+        seeds = [random.randint(0, 10_000) for _ in range(N_RUNS)]
+        eval_fn = functools.partial(evaluate_genome, config=config, seeds=seeds)
+
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+            fitnesses = pool.map(eval_fn, [genome for _, genome in genomes])
+
+        for (_, genome), fitness in zip(genomes, fitnesses):
+            genome.fitness = fitness
+
+        gen_best = max(genomes, key=lambda x: x[1].fitness)[1]
+        if best_ever is None or gen_best.fitness > best_ever.fitness:
+            best_ever = gen_best
+            with open(GENOME_PATH, 'wb') as f:
+                pickle.dump(best_ever, f)
+            print(f"  >> Nouveau meilleur genome sauvegarde (fitness={best_ever.fitness:.1f})")
+
+    best = population.run(eval_genomes, N_GENERATIONS)
 
     plot_stats(stats, os.path.join(os.path.dirname(__file__), 'fitness_courbe.png'))
-
-    print(f"\nMeilleur genome sauvegarde dans {genome_path}")
-    print(f"Fitness du meilleur genome : {best.fitness:.1f}")
+    print(f"\nMeilleur genome : fitness={best_ever.fitness:.1f}")
+    print(f"Sauvegarde dans {GENOME_PATH}")
 
 
 if __name__ == '__main__':

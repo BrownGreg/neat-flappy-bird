@@ -7,6 +7,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.monitor import Monitor
 import torch
+import optuna 
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'game'))
 from game_engine import FlappyBirdEnv
@@ -61,7 +62,7 @@ if __name__ == '__main__':
         "MlpPolicy",
         env,
         verbose=1,
-        device="cpu",
+        device="cuda",
         n_steps=2048,
         batch_size=256,      
         n_epochs=10,

@@ -1,6 +1,8 @@
 # Dimensions de la fenêtre
 SCREEN_WIDTH = 480
 SCREEN_HEIGHT = 640
+WIDTH = SCREEN_WIDTH
+HEIGHT = SCREEN_HEIGHT
 FPS = 60
 
 # Oiseau
